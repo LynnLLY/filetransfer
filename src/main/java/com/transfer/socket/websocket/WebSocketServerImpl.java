@@ -15,8 +15,10 @@ import org.springframework.stereotype.Component;
 import javax.websocket.*;
 import javax.websocket.server.PathParam;
 import javax.websocket.server.ServerEndpoint;
+import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -79,10 +81,28 @@ public class WebSocketServerImpl {
         log.info("用户连接:" + userId + ",当前在线人数为:" + getOnlineCount());
 
         try {
-            sendMessage("连接成功");
+            sendMessage(getFileList());
         } catch (IOException e) {
             log.error("用户:" + userId + ",网络异常!!!!!!");
         }
+    }
+
+    private String getFileList() {
+        List<FileScheduleVO> fileScheduleVOS = new ArrayList<>();
+        File file = new File("/Users/liuliyuan/Movies/test");
+        File[] fileList = file.listFiles();
+        for (File oneFile : fileList) {
+            FileScheduleVO fileScheduleVO = new FileScheduleVO();
+            fileScheduleVO.setFileFullName(oneFile.getName());
+            fileScheduleVO.setFileFullLength(oneFile.length());
+            fileScheduleVO.setFileTransferFullLength(0L);
+            fileScheduleVO.setFileSplitNum(5);
+            fileScheduleVO.setStatus(1);
+            fileScheduleVO.setTransferFullPercentage("00.00");
+            fileScheduleVOS.add(fileScheduleVO);
+        }
+        System.out.println(JSONObject.toJSONString(fileScheduleVOS));
+        return JSONObject.toJSONString(fileScheduleVOS);
     }
 
     /**
@@ -106,6 +126,7 @@ public class WebSocketServerImpl {
     @OnMessage
     public void onMessage(String message, Session session) {
         log.info("用户消息:" + userId + ",报文:" + message);
+        message.replaceAll("\"", "");
         if (StringUtils.isNotBlank(message)) {
             try {
                 /**
@@ -129,7 +150,10 @@ public class WebSocketServerImpl {
                  * 收到继续命令继续传输文件
                  */
                 if (message.equals("recover")) {
-                    FileUtils.openTrans();
+                    Thread thread = new Thread(new SendFile());
+                    thread.start();
+                    Thread.sleep(200);
+                    running = true;
                 }
             } catch (Exception e) {
                 e.printStackTrace();
