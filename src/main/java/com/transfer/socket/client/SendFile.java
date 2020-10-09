@@ -13,7 +13,7 @@ import java.util.Map;
  * @className SendFile
  * @projectName socket-transfer
  */
-public class SendFile implements Runnable{
+public class SendFile implements Runnable {
 
     public static void main(String[] args) {
         //开启文件传输，默认情况下文件传输是关闭的
@@ -25,11 +25,11 @@ public class SendFile implements Runnable{
             //传送的文件夹路径
             //FileUtils.split("D:\\sendTest");
             //"D:\\split" 代表着 传送的文件切割完毕之后存放的文件夹的路径
-            File file = new File("D:\\sendTest");
+            File file = new File("/Users/liuliyuan/Movies/test");
             File[] fileList = file.listFiles();
             for (File oneFile : fileList) {
                 //将文件的信息进行存储
-                fileMap.put(oneFile.getName(),new FileInfo(oneFile.getName(),oneFile.length(),0));
+                fileMap.put(oneFile.getName(), new FileInfo(oneFile.getName(), oneFile.length(), 0));
 
                 //此处精确启动每一个文件需要的传送线程，默认每个文件分为5份进行传送
                 File sendFile = new File(oneFile.getPath());
@@ -61,26 +61,26 @@ public class SendFile implements Runnable{
 //        FileUtils.stopTrans();
 
         //判断线程是否结束
-        while(true){
-            if( threads.size() !=0){
+        while (true) {
+            if (threads.size() != 0) {
                 Iterator<Thread> it = threads.iterator();
-                while(it.hasNext()){
+                while (it.hasNext()) {
                     Thread next = it.next();
-                    if(Thread.State.TERMINATED.equals(next.getState())){
+                    if (Thread.State.TERMINATED.equals(next.getState())) {
                         it.remove();
                     }
                 }
-            }else{
+            } else {
                 break;
             }
         }
-        System.out.println("没有删除前fileMap"+ fileMap.toString());
+        System.out.println("没有删除前fileMap" + fileMap.toString());
         //文件传送完毕之后，需要删除本地的切的碎文件，以及清除FileMap
         FileUtils.deleteSplitFiles();
         //删除完毕的
 //        fileMap.entrySet().removeIf(entry -> entry.getValue().getTransferLength() == entry.getValue().getFileLength());
         //删除完毕的之后，再删除本地的切碎的文件
-        System.out.println("删除后fileMap"+ fileMap.toString());
+        System.out.println("删除后fileMap" + fileMap.toString());
     }
 
 
@@ -99,7 +99,7 @@ public class SendFile implements Runnable{
             File[] fileList = file.listFiles();
             for (File oneFile : fileList) {
                 //将文件的信息进行存储
-                fileMap.put(oneFile.getName(),new FileInfo(oneFile.getName(),oneFile.length(),0));
+                fileMap.put(oneFile.getName(), new FileInfo(oneFile.getName(), oneFile.length(), 0));
 
                 //此处精确启动每一个文件需要的传送线程，默认每个文件分为5份进行传送
                 File sendFile = new File(oneFile.getPath());
@@ -131,25 +131,26 @@ public class SendFile implements Runnable{
 //        FileUtils.stopTrans();
 
         //判断线程是否结束
-        while(true){
-            if( threads.size() !=0){
+        while (true) {
+            if (threads.size() != 0) {
                 Iterator<Thread> it = threads.iterator();
-                while(it.hasNext()){
+                while (it.hasNext()) {
                     Thread next = it.next();
-                    if(Thread.State.TERMINATED.equals(next.getState())){
+                    if (Thread.State.TERMINATED.equals(next.getState())) {
                         it.remove();
                     }
                 }
-            }else{
+            } else {
                 break;
             }
         }
-        System.out.println("没有删除前fileMap"+ fileMap.toString());
+        System.out.println("没有删除前fileMap" + fileMap.toString());
         //文件传送完毕之后，需要删除本地的切的碎文件，以及清除FileMap
         FileUtils.deleteSplitFiles();
+        //fileMap.clear();
         //删除完毕的
 //        fileMap.entrySet().removeIf(entry -> entry.getValue().getTransferLength() == entry.getValue().getFileLength());
         //删除完毕的之后，再删除本地的切碎的文件
-        System.out.println("删除后fileMap"+ fileMap.toString());
+        System.out.println("删除后fileMap" + fileMap.toString());
     }
 }

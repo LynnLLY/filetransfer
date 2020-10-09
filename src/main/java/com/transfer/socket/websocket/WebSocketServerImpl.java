@@ -1,5 +1,6 @@
 package com.transfer.socket.websocket;
 
+import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import com.alibaba.fastjson.JSONObject;
@@ -7,7 +8,7 @@ import com.transfer.socket.client.FileInfo;
 import com.transfer.socket.client.FileUtils;
 import com.transfer.socket.client.SendFile;
 import com.transfer.socket.model.vo.FileScheduleVO;
-import com.transfer.socket.model.vo.SplitFileInfo;
+import org.apache.commons.lang.SerializationUtils;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +17,6 @@ import javax.websocket.server.PathParam;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,6 +49,14 @@ public class WebSocketServerImpl {
      * 接收userId
      */
     private String userId = "";
+    /**
+     * 是否正在发送文件标志位
+     */
+    private Boolean running = true;
+    /**
+     * stringFileInfoMap临时备份
+     */
+    private Map<String, FileInfo> stringFileInfoMapTemp;
 
     /**
      * 连接建立成功调用的方法
@@ -98,38 +106,60 @@ public class WebSocketServerImpl {
     @OnMessage
     public void onMessage(String message, Session session) {
         log.info("用户消息:" + userId + ",报文:" + message);
-        //可以群发消息
-        //消息保存到数据库、redis
         if (StringUtils.isNotBlank(message)) {
             try {
+                /**
+                 * 收到输入start命令开始传输文件
+                 */
                 if (message.equals("start")) {
                     Thread thread = new Thread(new SendFile());
                     thread.start();
-                    Thread.sleep(5000);
+                    Thread.sleep(200);
+                    Thread threadCallBack = new Thread(new CallBack());
+                    threadCallBack.start();
+                    running = true;
                 }
+                /**
+                 * 收到暂停命令暂停传输文件
+                 */
                 if (message.equals("pause")) {
                     FileUtils.stopTrans();
                 }
+                /**
+                 * 收到继续命令继续传输文件
+                 */
                 if (message.equals("recover")) {
                     FileUtils.openTrans();
                 }
-                //传送给对应toUserId用户的websocket
-                Boolean flag = true;
-                while (flag) {
-                    String fileInfo = getFileScheduleJSON();
-                    if (fileInfo.equals("0")) {
-                        flag = false;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    class CallBack implements Runnable {
+
+        @Override
+        public void run() {
+            //传送给对应toUserId用户的websocket
+            try {
+                while (running) {
+                    if (FileUtils.stop) {
+                        Thread.sleep(1000);
                         continue;
                     }
+                    String fileInfo = getFileScheduleJSON();
                     if (StringUtils.isNotBlank(userId) && webSocketMap.containsKey(userId)) {
                         webSocketMap.get(userId).sendMessage(fileInfo);
                     } else {
-                        flag = false;
+                        running = false;
                         log.error("请求的userId:" + userId + "不在该服务器上");
                     }
                     Thread.sleep(1500);
                 }
-            } catch (Exception e) {
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
@@ -140,56 +170,41 @@ public class WebSocketServerImpl {
         Map<String, FileScheduleVO> stringFileScheduleVOMap = new ConcurrentHashMap<>();
         //获取后台发送程序存储信息的类
         Map<String, FileInfo> stringFileInfoMap = FileUtils.fileMap;
+        boolean isFinal = false;
         if (stringFileInfoMap.isEmpty()) {
+            isFinal = true;
+            running = false;
+        } else {
+            stringFileInfoMapTemp = (Map<String, FileInfo>) SerializationUtils.clone((ConcurrentHashMap) stringFileInfoMap);
+        }
+        if (ObjectUtil.isEmpty(stringFileInfoMapTemp)) {
             return "0";
         }
         //对获取的信息类进行处理
-        for (Map.Entry<String, FileInfo> entries : stringFileInfoMap.entrySet()) {
+        for (Map.Entry<String, FileInfo> entries : stringFileInfoMapTemp.entrySet()) {
             FileInfo fileInfo = entries.getValue();
             //记录父文件的名称
             String fileName = fileInfo.getFileName();
-            //记录切割子文件信息
-            String splitFileName = entries.getKey();
             Long transferLength = fileInfo.getTransferLength();
             Long fileLength = fileInfo.getFileLength();
-            //将分割文件信息记录到实体类
-            SplitFileInfo splitFileInfo = new SplitFileInfo();
-            splitFileInfo.setSplitFileName(splitFileName);
-            splitFileInfo.setSplitFileTransferLength(transferLength);
-            splitFileInfo.setSplitFileLength(fileLength);
             Object percentage = Double.longBitsToDouble(transferLength) / Double.longBitsToDouble(fileLength) * 100;
-            splitFileInfo.setTransferPercentage(new DecimalFormat("#.00").format(percentage));
 
-            if (stringFileScheduleVOMap.containsKey(fileName)) {
-                //如果存在已有map映射取出并进行计算赋值
-                FileScheduleVO fileScheduleVOExist = stringFileScheduleVOMap.get(fileName);
-                fileScheduleVOExist.setFileSplitNum(fileScheduleVOExist.getFileSplitNum() + 1);
-                fileScheduleVOExist.setFileFullLength(fileScheduleVOExist.getFileFullLength() + fileLength);
-                fileScheduleVOExist.setFileTransferFullLength(
-                        fileScheduleVOExist.getFileTransferFullLength() + transferLength);
-                fileScheduleVOExist.setTransferFullPercentage(new DecimalFormat("#.00").format((Object) (
-                        Double.longBitsToDouble(fileScheduleVOExist.getFileTransferFullLength()) /
-                                Double.longBitsToDouble(fileScheduleVOExist.getFileFullLength()) *
-                                100)));
-                //追加子文件信息
-                List<SplitFileInfo> setFileSplitFileInfos = fileScheduleVOExist.getSplitFileInfos();
-                setFileSplitFileInfos.add(splitFileInfo);
+            //如果不存在已有map映射则初始化并put到map
+            FileScheduleVO fileScheduleVO = new FileScheduleVO();
+            fileScheduleVO.setFileFullName(fileName);
+            fileScheduleVO.setFileSplitNum(5);
+            fileScheduleVO.setFileFullLength(fileLength);
+            fileScheduleVO.setFileTransferFullLength(transferLength);
+            if (isFinal) {
+                fileScheduleVO.setTransferFullPercentage("100.00");
+                fileScheduleVO.setFileTransferFullLength(fileScheduleVO.getFileFullLength());
+                fileScheduleVO.setStatus(0);
             } else {
-                //如果不存在已有map映射则初始化并put到map
-                FileScheduleVO fileScheduleVO = new FileScheduleVO();
-                fileScheduleVO.setFileFullName(fileName);
-                fileScheduleVO.setFileSplitNum(1);
-                fileScheduleVO.setFileFullLength(fileLength);
-                fileScheduleVO.setFileTransferFullLength(transferLength);
                 fileScheduleVO.setTransferFullPercentage(new DecimalFormat("#.00").format(percentage));
-                //添加子文件信息
-                List<SplitFileInfo> setFileSplitFileInfos = new ArrayList<>();
-                setFileSplitFileInfos.add(splitFileInfo);
-                //记录子文件信息
-                fileScheduleVO.setSplitFileInfos(setFileSplitFileInfos);
-                //放入映射map
-                stringFileScheduleVOMap.put(fileName, fileScheduleVO);
+                fileScheduleVO.setStatus(1);
             }
+            //放入映射map
+            stringFileScheduleVOMap.put(fileName, fileScheduleVO);
         }
 
         //将map的value转化为list

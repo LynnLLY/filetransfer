@@ -37,6 +37,7 @@ public class FileUpLoadClient{
         if (file.exists()) {
             //	发送：文件名称、文件长度
             try {
+                //client = new SocketClient("192.168.20.196", 8899);
                 client = new SocketClient("127.0.0.1", 8899);
                 dos = new DataOutputStream(client.getOutputStream());
             } catch (IOException e2) {

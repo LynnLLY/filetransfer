@@ -1,5 +1,7 @@
 package com.transfer.socket.client;
 
+import java.io.Serializable;
+
 /**
  * @author admin
  * @version 1.0
@@ -7,7 +9,7 @@ package com.transfer.socket.client;
  * @className FileInfo
  * @projectName socket-transfer
  */
-public class FileInfo {
+public class FileInfo implements Serializable {
     @Override
     public String toString() {
         return "FileInfo{" +
