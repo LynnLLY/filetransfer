@@ -44,7 +44,7 @@ public class ThreadSplit implements Runnable {
         //将文件分割成5份
         file.getAbsolutePath();
         file.getName();
-        String split = "/Users/liuliyuan/Movies/split/";
+        String split = "D:\\split\\";
         File directory = new File(split);
         if(!directory.exists()) {
             directory.mkdir();

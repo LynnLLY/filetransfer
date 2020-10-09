@@ -23,7 +23,7 @@ public class FileUpLoadClient{
     private boolean quit = false;        //退出
 
 
-    public int sendFile(String filePath) {
+    public int sendFile(File file, int fragIndex, long offset, long transferLen) {
 
         DataOutputStream dos = null;    //  上传服务器：输出流
         DataInputStream dis = null;        //  获取服务器：输入流
@@ -31,11 +31,10 @@ public class FileUpLoadClient{
         FileInputStream fis = null;        //  读取文件：输入流
 
         //  获取：上传文件
-        File file = new File(filePath);
+        //File file = new File(filePath);
 
         //  ==================== 节点：文件是否存在 ====================
         if (file.exists()) {
-
             //	发送：文件名称、文件长度
             try {
                 client = new SocketClient("127.0.0.1", 8899);
@@ -45,9 +44,13 @@ public class FileUpLoadClient{
                 e2.printStackTrace();
             }
             try {
-                dos.writeUTF(file.getName());
+                //文件分块的名字
+                String fragFileName = file.getName() + "_" + fragIndex;
+                //dos.writeUTF(file.getName());
+                dos.writeUTF(fragFileName);
                 dos.flush();
-                dos.writeLong(file.length());
+                //dos.writeLong(file.length());
+                dos.writeLong(transferLen);
                 dos.flush();
             } catch (IOException e2) {
                 logger.error("Socket客户端：2.向服务器发送文件名、长度发生错误");
@@ -61,7 +64,7 @@ public class FileUpLoadClient{
                 logger.error("Socket客户端：3.向服务器发送文件名、长度发生错误");
                 e2.printStackTrace();
             }
-            while (serverLength == -1) {
+            if (serverLength == -1) {
                 try {
                     serverLength = dis.readLong();
                 } catch (IOException e) {
@@ -87,8 +90,9 @@ public class FileUpLoadClient{
 
 
             System.out.println("======== 开始传输文件 ========");
-            byte[] bytes = new byte[1024];
-            int length = 1024;
+            byte[] buff = new byte[1024];
+            int buffLen = 1024;
+            //已经上传的文件长度
             long progress = serverLength;
 
             //  设置游标：文件读取的位置
@@ -96,22 +100,55 @@ public class FileUpLoadClient{
                 serverLength = 0L;
             }
             try {
-                fis.skip(serverLength);
+                //fis.skip(serverLength);
+                fis.skip(offset + serverLength);
             } catch (IOException e1) {
                 logger.error("Socket客户端：7.设置游标位置发生错误，请确认文件流是否被篡改");
                 e1.printStackTrace();
             }
-
             try {
-                while (((length = fis.read(bytes, 0, bytes.length)) != -1)
-                        && quit != true && !FileUtils.stop ) {
-                    dos.write(bytes, 0, length);
-                    dos.flush();
-                    progress += length;
-                    //添加文件的传输的长度
-                    FileUtils.addTrans(file.getName(),length);
-                    status = (100 * progress / file.length());
+//                while (((length = fis.read(bytes, 0, bytes.length)) != -1)
+//                        && quit != true && !FileUtils.stop ) {
+//                    dos.write(bytes, 0, length);
+//                    dos.flush();
+//                    progress += length;
+//                    //添加文件的传输的长度
+//                    //FileUtils.addTrans(file.getName(), length);
+//                    FileUtils.addTrans(file.getName() + "_" + fragIndex, length);
+//                    status = (100 * progress / file.length());
+//                }
+                //此处逻辑修改为精确计算需要读取的次数
+                long readCnt = 0;
+                int readLen = 0;
+                //获取剩余需要上传的文件的长度
+                long surplusLength = transferLen - serverLength;
 
+                if ((surplusLength % buffLen) > 0) {
+                    readCnt = surplusLength / buffLen + 1;
+
+                } else {
+                    readCnt = surplusLength / buffLen;
+                }
+                for (int loop = 0; loop < readCnt; loop++) {
+                    if (FileUtils.stop || this.quit) {
+                        break;
+                    }
+                    //最后一次上传
+                    if((surplusLength % buffLen) > 0 && loop == readCnt -1){
+                        //最后一次传送的数量，不能够多传
+                        buffLen =(int) (surplusLength % buffLen);
+                    }
+                    if ((readLen = fis.read(buff, 0, buffLen)) == -1) {
+                        break;
+                    }
+
+                    dos.write(buff, 0, readLen);
+                    dos.flush();
+                    progress += readLen;
+                    //添加文件的传输的长度
+                    FileUtils.addTrans(file.getName(), readLen);
+                    //FileUtils.addTrans(file.getName() + "_" + fragIndex, length);
+                    status = (100 * progress / file.length());
                 }
             } catch (IOException e) {
                 logger.error("Socket客户端：8.设置游标位置发生错误，请确认文件流是否被篡改");
@@ -125,7 +162,6 @@ public class FileUpLoadClient{
                         e1.printStackTrace();
                     }
                 }
-
                 if (dos != null){
                     try {
                         dos.close();
@@ -148,11 +184,8 @@ public class FileUpLoadClient{
             logger.error("Socket客户端：0.文件不存在");
             return -1;
         }
-
         return 1;
     }
-
-
     //------------------这下面的可以不用--------------------
 
     /**
@@ -171,7 +204,7 @@ public class FileUpLoadClient{
                     num = status;
                 }
                 if (status == 101){
-//                    System.gc();
+                   System.gc();
                 }
             }
         }, 0, 100);
