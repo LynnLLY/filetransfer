@@ -150,9 +150,7 @@ public class WebSocketServerImpl {
                  * 收到继续命令继续传输文件
                  */
                 if (message.equals("recover")) {
-                    Thread thread = new Thread(new SendFile());
-                    thread.start();
-                    Thread.sleep(200);
+                    FileUtils.openTrans();
                     running = true;
                 }
             } catch (Exception e) {

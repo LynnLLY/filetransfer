@@ -131,8 +131,15 @@ public class FileUpLoadClient{
                     readCnt = surplusLength / buffLen;
                 }
                 for (int loop = 0; loop < readCnt; loop++) {
-                    if (FileUtils.stop || this.quit) {
+                    if (this.quit) {
                         break;
+                    }
+                    while (FileUtils.stop){
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                     }
                     //最后一次上传
                     if((surplusLength % buffLen) > 0 && loop == readCnt -1){
