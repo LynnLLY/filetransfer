@@ -1,4 +1,4 @@
-package model.vo;
+package com.transfer.socket.model.vo;
 
 import lombok.Data;
 

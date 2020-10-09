@@ -1,6 +1,5 @@
-package model.vo;
+package com.transfer.socket.model.vo;
 
-import com.transfer.socket.client.FileInfo;
 import lombok.Data;
 
 import java.util.List;

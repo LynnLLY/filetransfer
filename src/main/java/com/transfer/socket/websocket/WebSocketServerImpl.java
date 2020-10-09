@@ -6,8 +6,8 @@ import com.alibaba.fastjson.JSONObject;
 import com.transfer.socket.client.FileInfo;
 import com.transfer.socket.client.FileUtils;
 import com.transfer.socket.client.SendFile;
-import model.vo.FileScheduleVO;
-import model.vo.SplitFileInfo;
+import com.transfer.socket.model.vo.FileScheduleVO;
+import com.transfer.socket.model.vo.SplitFileInfo;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Component;
 
