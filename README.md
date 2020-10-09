@@ -1,1 +1,1 @@
-# filetransfer
+# filetransfer-client
